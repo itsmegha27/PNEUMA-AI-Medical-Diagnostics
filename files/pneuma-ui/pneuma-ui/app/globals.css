@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   PNEUMA design tokens — "the light box"
+   Cool film-toned paper surface + a true-black backlit slab.
+   The radiograph is the only bold element in the product.
+   ============================================================ */
+:root {
+  color-scheme: light dark;
+
+  --paper: #f1f3f4;
+  --raised: #fafbfb;
+  --sunken: #e7eaec;
+  --slab: #08090a;
+
+  --ink: #161b1f;
+  --ink-2: #4c555c;
+  --ink-3: #838d95;
+  --ink-slab: #e9eef1;
+  --ink-slab-2: #7c868c;
+
+  --line: rgba(22, 27, 31, 0.11);
+  --line-2: rgba(22, 27, 31, 0.2);
+  --line-slab: rgba(233, 238, 241, 0.14);
+
+  --blue: #0f62d6;
+  --green: #0e7c5a;
+  --red: #c03a2e;
+  --amber: #b4790f;
+
+  --spill: 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 6px rgba(16, 24, 32, 0.06),
+    0 24px 60px -24px rgba(16, 32, 48, 0.34);
+
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --paper:#0d0f11; --raised:#15181b; --sunken:#101315;
+    --ink:#e8ecee; --ink-2:#a0aab1; --ink-3:#6d777d;
+    --line:rgba(232,236,238,.12); --line-2:rgba(232,236,238,.22);
+    --blue:#5c9bff; --green:#3fbf90; --red:#f0705f; --amber:#e0a83c;
+    --spill: 0 0 0 1px rgba(255,255,255,.05), 0 30px 70px -30px rgba(0,0,0,.9); }
+}
+:root[data-theme="dark"] { --paper:#0d0f11; --raised:#15181b; --sunken:#101315;
+  --ink:#e8ecee; --ink-2:#a0aab1; --ink-3:#6d777d;
+  --line:rgba(232,236,238,.12); --line-2:rgba(232,236,238,.22);
+  --blue:#5c9bff; --green:#3fbf90; --red:#f0705f; --amber:#e0a83c;
+  --spill: 0 0 0 1px rgba(255,255,255,.05), 0 30px 70px -30px rgba(0,0,0,.9); }
+
+@layer base {
+  body { @apply bg-paper text-ink font-sans antialiased; font-size: 15px; line-height: 1.55; }
+  :focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 2px; }
+  ::selection { background: var(--blue); color: #fff; }
+}
+
+@layer components {
+  /* Archivo carries the personality through its WIDTH axis, not a second family. */
+  .type-display { font-variation-settings: "wdth" 74, "wght" 620;
+    font-size: clamp(46px, 7.4vw, 104px); line-height: 0.92; letter-spacing: -0.022em; }
+  .type-h2 { font-variation-settings: "wdth" 82, "wght" 600;
+    font-size: clamp(26px, 3.1vw, 38px); line-height: 1.05; letter-spacing: -0.015em; }
+  .type-h3 { font-variation-settings: "wdth" 92, "wght" 600; font-size: 17px; letter-spacing: -0.008em; }
+  .type-strong { font-variation-settings: "wdth" 94, "wght" 560; }
+  .type-num { @apply font-mono tabular-nums; letter-spacing: -0.02em; }
+  /* instrument label — sentence case on paper; uppercase is reserved for
+     text burned into the slab, where it is diegetically correct. */
+  .type-label { @apply font-mono text-ink-3; font-size: 10.5px; letter-spacing: 0.04em; font-weight: 500; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important; }
+}

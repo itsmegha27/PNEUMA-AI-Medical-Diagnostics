@@ -1,0 +1,1783 @@
+<!DOCTYPE html>
+<html lang="en" data-view="overview">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PNEUMA — chest radiograph analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   PNEUMA — design tokens
+   Concept: "the light box". Cool paper surface + true-black
+   backlit slab. The radiograph is the only bold element.
+   ============================================================ */
+:root{
+  color-scheme: light dark;
+
+  /* surfaces */
+  --paper:      #F1F3F4;
+  --raised:     #FAFBFB;
+  --sunken:     #E7EAEC;
+  --slab:       #08090A;
+  --slab-2:     #121517;
+
+  /* ink */
+  --ink:        #161B1F;
+  --ink-2:      #4C555C;
+  --ink-3:      #838D95;
+  --ink-slab:   #E9EEF1;
+  --ink-slab-2: #7C868C;
+
+  /* structure */
+  --line:        rgba(22,27,31,.11);
+  --line-2:      rgba(22,27,31,.20);
+  --line-slab:   rgba(233,238,241,.14);
+
+  /* semantics */
+  --blue:   #0F62D6;
+  --blue-s: rgba(15,98,214,.10);
+  --green:  #0E7C5A;
+  --green-s:rgba(14,124,90,.10);
+  --red:    #C03A2E;
+  --red-s:  rgba(192,58,46,.10);
+  --amber:  #B4790F;
+  --amber-s:rgba(180,121,15,.12);
+
+  /* light spill from the slab */
+  --spill: 0 1px 0 rgba(255,255,255,.6), 0 2px 6px rgba(16,24,32,.06),
+           0 24px 60px -24px rgba(16,32,48,.34);
+
+  /* type */
+  --sans: 'Archivo', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --rail: 68px;
+  --pad: clamp(20px, 4.2vw, 64px);
+
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+:root:not([data-theme="light"]){ }
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:  #0D0F11;
+    --raised: #15181B;
+    --sunken: #101315;
+    --ink:    #E8ECEE;
+    --ink-2:  #A0AAB1;
+    --ink-3:  #6D777D;
+    --line:   rgba(232,236,238,.12);
+    --line-2: rgba(232,236,238,.22);
+    --blue:   #5C9BFF; --blue-s: rgba(92,155,255,.14);
+    --green:  #3FBF90; --green-s: rgba(63,191,144,.14);
+    --red:    #F0705F; --red-s: rgba(240,112,95,.14);
+    --amber:  #E0A83C; --amber-s: rgba(224,168,60,.16);
+    --spill: 0 0 0 1px rgba(255,255,255,.05), 0 30px 70px -30px rgba(0,0,0,.9);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0D0F11; --raised:#15181B; --sunken:#101315;
+  --ink:#E8ECEE; --ink-2:#A0AAB1; --ink-3:#6D777D;
+  --line:rgba(232,236,238,.12); --line-2:rgba(232,236,238,.22);
+  --blue:#5C9BFF; --blue-s:rgba(92,155,255,.14);
+  --green:#3FBF90; --green-s:rgba(63,191,144,.14);
+  --red:#F0705F; --red-s:rgba(240,112,95,.14);
+  --amber:#E0A83C; --amber-s:rgba(224,168,60,.16);
+  --spill: 0 0 0 1px rgba(255,255,255,.05), 0 30px 70px -30px rgba(0,0,0,.9);
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-variation-settings:'wdth' 100;
+  font-size:15px; line-height:1.55;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+::selection{ background:var(--blue); color:#fff; }
+button,input,select{ font:inherit; color:inherit; }
+button{ background:none; border:0; cursor:pointer; }
+a{ color:inherit; }
+:focus-visible{ outline:2px solid var(--blue); outline-offset:3px; border-radius:2px; }
+
+/* ---------- type scale ---------- */
+.display{
+  font-variation-settings:'wdth' 74,'wght' 620;
+  font-size:clamp(46px, 7.4vw, 104px); line-height:.92;
+  letter-spacing:-.022em; margin:0; text-wrap:balance;
+}
+.h2{ font-variation-settings:'wdth' 82,'wght' 600; font-size:clamp(26px,3.1vw,38px);
+     line-height:1.05; letter-spacing:-.015em; margin:0; }
+.h3{ font-variation-settings:'wdth' 92,'wght' 600; font-size:17px; line-height:1.3;
+     letter-spacing:-.008em; margin:0; }
+.lede{ font-size:clamp(16px,1.35vw,18px); line-height:1.6; color:var(--ink-2);
+       max-width:46ch; margin:0; }
+p{ margin:0; }
+.prose{ color:var(--ink-2); max-width:62ch; }
+
+/* mono instrument labels — sentence case on paper, uppercase only on the slab */
+.lab{ font-family:var(--mono); font-size:10.5px; letter-spacing:.04em;
+      color:var(--ink-3); font-weight:500; }
+.num{ font-family:var(--mono); font-variant-numeric:tabular-nums;
+      font-feature-settings:'zero' 1; letter-spacing:-.02em; }
+
+/* ============================================================
+   Shell
+   ============================================================ */
+.app{ display:grid; grid-template-columns:var(--rail) minmax(0,1fr); min-height:100vh; }
+
+.rail{
+  position:sticky; top:0; height:100vh; z-index:40;
+  border-right:1px solid var(--line); background:var(--raised);
+  display:flex; flex-direction:column; align-items:center;
+  padding:18px 0 14px;
+}
+.mark{ width:32px; height:32px; display:grid; place-items:center; margin-bottom:26px; }
+.mark svg{ width:26px; height:26px; }
+.nav{ display:flex; flex-direction:column; gap:2px; width:100%; align-items:center; }
+.navbtn{
+  position:relative; width:44px; height:44px; border-radius:3px;
+  display:grid; place-items:center; color:var(--ink-3);
+  transition:color .16s ease, background .16s ease;
+}
+.navbtn svg{ width:19px; height:19px; stroke-width:1.5; }
+.navbtn:hover{ color:var(--ink); background:var(--sunken); }
+.navbtn[aria-current="page"]{ color:var(--ink); }
+.navbtn[aria-current="page"]::before{
+  content:''; position:absolute; left:-12px; top:12px; bottom:12px; width:2px;
+  background:var(--ink); border-radius:0 2px 2px 0;
+}
+.navbtn .tip{
+  position:absolute; left:calc(100% + 10px); top:50%; translate:0 -50%;
+  background:var(--ink); color:var(--paper); font-family:var(--mono); font-size:11px;
+  padding:4px 8px; border-radius:3px; white-space:nowrap; opacity:0; pointer-events:none;
+  transition:opacity .14s ease, translate .14s ease; translate:-4px -50%; z-index:50;
+}
+.navbtn:hover .tip{ opacity:1; translate:0 -50%; }
+.rail-foot{ margin-top:auto; display:flex; flex-direction:column; align-items:center; gap:10px; }
+.pulse{ width:7px; height:7px; border-radius:50%; background:var(--green);
+        box-shadow:0 0 0 0 var(--green-s); animation:pulse 2.6s ease-out infinite; }
+@keyframes pulse{ 0%{box-shadow:0 0 0 0 rgba(14,124,90,.35)} 70%{box-shadow:0 0 0 9px rgba(14,124,90,0)} 100%{box-shadow:0 0 0 0 rgba(14,124,90,0)} }
+.vert{ writing-mode:vertical-rl; font-family:var(--mono); font-size:10px; color:var(--ink-3);
+       letter-spacing:.08em; }
+
+.main{ min-width:0; display:flex; flex-direction:column; }
+
+.topbar{
+  position:sticky; top:0; z-index:30; display:flex; align-items:center; gap:14px;
+  padding:0 var(--pad); height:52px; background:color-mix(in srgb, var(--paper) 86%, transparent);
+  backdrop-filter:blur(14px) saturate(1.4); border-bottom:1px solid var(--line);
+}
+.topbar .where{ font-family:var(--mono); font-size:11px; color:var(--ink-2); letter-spacing:.02em; }
+.topbar .where b{ color:var(--ink); font-weight:500; }
+.topbar .spacer{ flex:1; }
+.chip{
+  display:inline-flex; align-items:center; gap:7px; height:23px; padding:0 9px;
+  border:1px solid var(--line-2); border-radius:2px; font-family:var(--mono);
+  font-size:10.5px; color:var(--ink-2); white-space:nowrap;
+}
+.chip.warn{ border-color:color-mix(in srgb,var(--amber) 42%, transparent); color:var(--amber); background:var(--amber-s); }
+.chip .dot{ width:5px; height:5px; border-radius:50%; background:currentColor; }
+.iconbtn{ width:30px; height:30px; display:grid; place-items:center; border:1px solid var(--line);
+          border-radius:3px; color:var(--ink-2); transition:border-color .15s, color .15s; }
+.iconbtn:hover{ color:var(--ink); border-color:var(--line-2); }
+.iconbtn svg{ width:15px; height:15px; stroke-width:1.6; }
+
+/* ============================================================
+   The light box — the one bold element
+   ============================================================ */
+.slab{
+  position:relative; background:var(--slab); border-radius:4px; overflow:hidden;
+  box-shadow:var(--spill); isolation:isolate;
+}
+.slab::after{ /* backlight falloff */
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(120% 90% at 50% 45%, rgba(190,225,255,.055), transparent 62%);
+}
+.film{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+.film img,.film svg{ width:100%; height:100%; object-fit:contain; display:block; }
+.gcard .slab > svg{ width:100%; height:100%; display:block; }
+
+/* burned-in overlay text — uppercase is correct here */
+.burn{
+  position:absolute; font-family:var(--mono); font-size:9.5px; letter-spacing:.11em;
+  text-transform:uppercase; color:var(--ink-slab-2); pointer-events:none; z-index:3;
+  text-shadow:0 0 10px rgba(0,0,0,.9);
+}
+.burn.tl{ top:12px; left:13px; } .burn.tr{ top:12px; right:13px; text-align:right; }
+.burn.bl{ bottom:12px; left:13px; } .burn.br{ bottom:12px; right:13px; text-align:right; }
+.burn b{ color:var(--ink-slab); font-weight:500; display:block; }
+
+/* corner brackets */
+.brk{ position:absolute; width:14px; height:14px; border:1px solid var(--line-slab); z-index:3; pointer-events:none; }
+.brk.a{ top:8px; left:8px; border-right:0; border-bottom:0; }
+.brk.b{ top:8px; right:8px; border-left:0; border-bottom:0; }
+.brk.c{ bottom:8px; left:8px; border-right:0; border-top:0; }
+.brk.d{ bottom:8px; right:8px; border-left:0; border-top:0; }
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+.btn{
+  display:inline-flex; align-items:center; gap:10px; height:44px; padding:0 20px;
+  border-radius:3px; font-size:14px; font-variation-settings:'wdth' 96,'wght' 560;
+  letter-spacing:-.005em; border:1px solid transparent; transition:.16s ease;
+  transition-property:background,color,border-color,transform,box-shadow;
+}
+.btn:active{ transform:translateY(1px); }
+.btn-primary{ background:var(--ink); color:var(--paper); }
+.btn-primary:hover{ box-shadow:0 8px 22px -10px rgba(16,24,32,.7); }
+.btn-ghost{ border-color:var(--line-2); color:var(--ink); }
+.btn-ghost:hover{ background:var(--raised); border-color:var(--ink-3); }
+.btn-sm{ height:32px; padding:0 12px; font-size:12.5px; }
+.btn[disabled]{ opacity:.4; pointer-events:none; }
+.btn kbd{ font-family:var(--mono); font-size:10px; border:1px solid currentColor;
+          opacity:.45; border-radius:2px; padding:1px 4px; }
+
+/* ============================================================
+   Layout helpers
+   ============================================================ */
+.pad{ padding-inline:var(--pad); }
+.section{ padding-block:clamp(40px,5.4vw,78px); }
+.rule{ height:1px; background:var(--line); border:0; margin:0; }
+.ledger{ /* left margin ledger, like a report margin */
+  display:grid; grid-template-columns:118px minmax(0,1fr); gap:clamp(20px,3vw,44px);
+}
+@media (max-width:900px){ .ledger{ grid-template-columns:1fr; gap:14px; } }
+.ledger .side{ padding-top:5px; }
+.ledger .side .lab{ display:block; }
+.ledger .side p{ font-size:12px; color:var(--ink-3); margin-top:7px; line-height:1.5; }
+
+/* ============================================================
+   1 · Overview
+   ============================================================ */
+.hero{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.86fr);
+       align-items:center; gap:clamp(24px,3vw,56px);
+       padding-block:clamp(36px,5vw,72px); padding-left:var(--pad); padding-right:0; }
+.hero-copy{ max-width:620px; position:relative; z-index:2; }
+.hero .display{ margin-bottom:22px; }
+.hero .display em{ font-style:normal; display:block; color:var(--ink); }
+.hero-actions{ display:flex; gap:12px; flex-wrap:wrap; margin-top:30px; align-items:center; }
+.hero-slab{ aspect-ratio:4/5; max-height:min(74vh,720px); border-radius:4px 0 0 4px; }
+.hero-note{ display:flex; gap:10px; align-items:flex-start; margin-top:26px;
+            padding-top:16px; border-top:1px solid var(--line); max-width:44ch; }
+.hero-note p{ font-size:12.5px; color:var(--ink-3); line-height:1.5; }
+
+.statstrip{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border-top:1px solid var(--line); }
+.stat{ padding:22px var(--pad) 24px; border-right:1px solid var(--line); }
+.stat:last-child{ border-right:0; }
+.stat .v{ font-family:var(--mono); font-size:clamp(24px,2.6vw,32px); font-weight:500;
+          letter-spacing:-.03em; display:block; line-height:1.1; }
+.stat .k{ font-size:12.5px; color:var(--ink-2); margin-top:6px; }
+.stat .s{ font-family:var(--mono); font-size:10px; color:var(--ink-3); margin-top:3px; }
+@media (max-width:760px){ .statstrip{ grid-template-columns:1fr 1fr; }
+  .stat{ border-bottom:1px solid var(--line); padding-inline:var(--pad); }
+  .stat:nth-child(2n){ border-right:0; } }
+
+.steps{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:clamp(18px,2.6vw,40px); }
+.step{ border-top:1px solid var(--ink); padding-top:16px; }
+.step .n{ font-family:var(--mono); font-size:11px; color:var(--ink-3); }
+.step h4{ margin:10px 0 7px; font-size:16px; font-variation-settings:'wdth' 92,'wght' 600; letter-spacing:-.01em; }
+.step p{ font-size:13.5px; color:var(--ink-2); line-height:1.55; }
+@media (max-width:760px){ .steps{ grid-template-columns:1fr; } }
+
+/* ============================================================
+   2 · Workspace
+   ============================================================ */
+.work{ display:grid; grid-template-columns:minmax(0,1fr) 372px; gap:0; align-items:start; }
+.work-left{ padding:var(--pad) clamp(16px,2vw,28px) var(--pad) var(--pad); min-width:0; }
+.work-right{ position:sticky; top:52px; border-left:1px solid var(--line);
+             background:var(--raised); min-height:calc(100vh - 52px); }
+@media (max-width:1080px){
+  .work{ grid-template-columns:1fr; }
+  .work-left{ padding-right:var(--pad); }
+  .work-right{ position:static; min-height:0; border-left:0; border-top:1px solid var(--line); }
+}
+
+.viewer{ aspect-ratio:1/1; max-height:min(66vh,760px); width:100%; }
+@media (max-width:640px){ .viewer{ aspect-ratio:4/5; } }
+.stage{ position:absolute; inset:0; display:grid; place-items:center; overflow:hidden; }
+.stage .film-wrap{ width:100%; height:100%; transform-origin:center center;
+                   transition:transform .22s cubic-bezier(.2,.7,.3,1); }
+.stage.grabbing{ cursor:grabbing; }
+.stage.grab{ cursor:grab; }
+
+/* drop zone / empty */
+.dz{ position:absolute; inset:0; display:grid; place-items:center; z-index:4; }
+.dz-inner{ text-align:center; padding:28px; border:1px dashed var(--line-slab); border-radius:3px;
+           max-width:360px; transition:border-color .2s, background .2s; }
+.slab.dragover .dz-inner{ border-color:var(--blue); background:rgba(15,98,214,.08); }
+.dz h4{ color:var(--ink-slab); font-size:15px; font-variation-settings:'wdth' 94,'wght' 560; margin:14px 0 6px; }
+.dz p{ color:var(--ink-slab-2); font-size:12.5px; line-height:1.5; }
+.dz .glyph{ width:30px; height:30px; margin:0 auto; color:var(--ink-slab-2); }
+.dz .or{ font-family:var(--mono); font-size:10px; color:var(--ink-slab-2); margin:16px 0 10px;
+         letter-spacing:.08em; text-transform:uppercase; }
+.linkbtn{ color:var(--ink-slab); font-size:12.5px; border-bottom:1px solid var(--line-slab);
+          padding-bottom:1px; transition:border-color .15s; }
+.linkbtn:hover{ border-color:var(--ink-slab); }
+
+/* toolbar */
+.toolbar{
+  position:absolute; left:50%; bottom:14px; translate:-50% 0; z-index:6;
+  display:flex; align-items:center; gap:2px; padding:5px;
+  background:rgba(16,19,21,.82); backdrop-filter:blur(18px);
+  border:1px solid var(--line-slab); border-radius:4px; color:var(--ink-slab);
+  opacity:0; translate:-50% 8px; pointer-events:none; transition:opacity .2s ease, translate .2s ease;
+}
+.slab.loaded .toolbar{ opacity:1; translate:-50% 0; pointer-events:auto; }
+.tb{ width:30px; height:30px; display:grid; place-items:center; border-radius:3px;
+     color:var(--ink-slab-2); transition:color .14s, background .14s; }
+.tb:hover{ color:var(--ink-slab); background:rgba(255,255,255,.08); }
+.tb[aria-pressed="true"]{ color:#fff; background:rgba(255,255,255,.14); }
+.tb svg{ width:15px; height:15px; stroke-width:1.6; }
+.tb-sep{ width:1px; height:18px; background:var(--line-slab); margin:0 5px; }
+.zoomval{ font-family:var(--mono); font-size:10.5px; min-width:44px; text-align:center; color:var(--ink-slab-2); }
+.slider{ display:flex; align-items:center; gap:7px; padding:0 8px; }
+.slider label{ font-family:var(--mono); font-size:9.5px; letter-spacing:.08em;
+               text-transform:uppercase; color:var(--ink-slab-2); }
+input[type=range]{ -webkit-appearance:none; appearance:none; width:72px; height:16px; background:none; }
+input[type=range]::-webkit-slider-runnable-track{ height:1px; background:var(--line-slab); }
+input[type=range]::-moz-range-track{ height:1px; background:var(--line-slab); }
+input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:9px; height:9px; border-radius:50%;
+  background:var(--ink-slab); margin-top:-4px; cursor:ew-resize; }
+input[type=range]::-moz-range-thumb{ width:9px; height:9px; border:0; border-radius:50%;
+  background:var(--ink-slab); cursor:ew-resize; }
+
+/* scanning */
+.scan{ position:absolute; inset:0; z-index:5; pointer-events:none; opacity:0; transition:opacity .3s; }
+.slab.analyzing .scan{ opacity:1; }
+.scan .sweep{
+  position:absolute; left:0; right:0; height:120px;
+  background:linear-gradient(to bottom, transparent, rgba(150,205,255,.13) 45%, rgba(190,225,255,.5) 50%, rgba(150,205,255,.13) 55%, transparent);
+  animation:sweep 2.1s cubic-bezier(.45,0,.55,1) infinite;
+}
+@keyframes sweep{ 0%{top:-120px} 100%{top:100%} }
+.scan .grid{ position:absolute; inset:0; opacity:.5;
+  background-image:linear-gradient(var(--line-slab) 1px,transparent 1px),linear-gradient(90deg,var(--line-slab) 1px,transparent 1px);
+  background-size:52px 52px; mask-image:radial-gradient(circle at 50% 50%, #000 20%, transparent 72%); }
+
+/* attribution overlay */
+.attr{ position:absolute; inset:0; z-index:4; pointer-events:none; opacity:0;
+       transition:opacity .5s ease; mix-blend-mode:screen; }
+.attr.on{ opacity:1; }
+.attr svg{ width:100%; height:100%; }
+
+/* sample row */
+.samples{ display:flex; gap:9px; margin-top:14px; align-items:center; flex-wrap:wrap; }
+.sample{ width:52px; height:52px; border-radius:3px; overflow:hidden; background:var(--slab);
+         border:1px solid transparent; position:relative; transition:border-color .15s, transform .15s; }
+.sample:hover{ transform:translateY(-2px); border-color:var(--line-2); }
+.sample[aria-pressed="true"]{ border-color:var(--ink); }
+.sample svg{ width:100%; height:100%; }
+
+/* right panel */
+.panel-sec{ padding:20px var(--pad-r,22px); border-bottom:1px solid var(--line); }
+.panel-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:14px; }
+.panel-head .lab{ text-transform:none; }
+
+/* pipeline (a genuine sequence — numbering earned) */
+.pipe{ display:flex; flex-direction:column; gap:0; }
+.pipe li{ display:grid; grid-template-columns:18px 1fr auto; gap:10px; align-items:center;
+          padding:6px 0; font-size:12.5px; color:var(--ink-3); list-style:none; }
+.pipe li .i{ font-family:var(--mono); font-size:10px; }
+.pipe li[data-state="run"]{ color:var(--ink); }
+.pipe li[data-state="done"]{ color:var(--ink-2); }
+.pipe .tick{ font-family:var(--mono); font-size:10px; color:var(--ink-3); }
+.spin{ width:9px; height:9px; border:1.4px solid var(--line-2); border-top-color:var(--blue);
+       border-radius:50%; animation:spin .7s linear infinite; }
+@keyframes spin{ to{ transform:rotate(360deg) } }
+.pipe ul{ margin:0; padding:0; }
+
+/* verdict */
+.verdict{ padding:22px var(--pad-r,22px); border-bottom:1px solid var(--line); }
+.verdict .word{ font-variation-settings:'wdth' 78,'wght' 640; font-size:clamp(34px,3.6vw,46px);
+                line-height:1; letter-spacing:-.02em; margin:0; }
+.verdict[data-c="NORMAL"] .word{ color:var(--green); }
+.verdict[data-c="PNEUMONIA"] .word{ color:var(--red); }
+.verdict .sub{ font-size:12.5px; color:var(--ink-2); margin-top:9px; max-width:34ch; line-height:1.5; }
+.reveal{ animation:reveal .5s cubic-bezier(.16,1,.3,1) both; }
+@keyframes reveal{ from{ opacity:0; letter-spacing:.06em; filter:blur(5px) } to{ opacity:1; letter-spacing:-.02em; filter:none } }
+
+/* diverging probability axis */
+.axis{ margin-top:4px; }
+.axis .ends{ display:flex; justify-content:space-between; font-family:var(--mono); font-size:10.5px; }
+.axis .ends .n{ color:var(--green); } .axis .ends .p{ color:var(--red); }
+.axis .track{ position:relative; height:26px; margin:9px 0 7px; background:var(--sunken); border-radius:2px; overflow:hidden; }
+.axis .fillN{ position:absolute; left:0; top:0; bottom:0; background:var(--green); opacity:.16; transition:width .7s cubic-bezier(.16,1,.3,1); }
+.axis .fillP{ position:absolute; right:0; top:0; bottom:0; background:var(--red); opacity:.16; transition:width .7s cubic-bezier(.16,1,.3,1); }
+.axis .mid{ position:absolute; left:50%; top:0; bottom:0; width:1px; background:var(--line-2); }
+.axis .needle{ position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--ink);
+               transition:left .7s cubic-bezier(.16,1,.3,1); }
+.axis .needle::after{ content:''; position:absolute; top:-1px; left:-3px; width:8px; height:8px;
+                      background:var(--ink); clip-path:polygon(50% 100%,0 0,100% 0); }
+.axis .vals{ display:flex; justify-content:space-between; font-family:var(--mono); font-size:11.5px; color:var(--ink-2); }
+
+/* confidence scale with exposure ticks */
+.conf{ margin-top:2px; }
+.conf .row{ display:flex; align-items:baseline; justify-content:space-between; }
+.conf .big{ font-family:var(--mono); font-size:30px; font-weight:500; letter-spacing:-.03em; }
+.conf .ticks{ position:relative; height:22px; margin-top:8px; }
+.conf .ticks .t{ position:absolute; top:8px; width:1px; height:6px; background:var(--line-2); }
+.conf .ticks .t.major{ top:4px; height:10px; background:var(--ink-3); }
+.conf .bar{ position:absolute; left:0; top:0; height:3px; background:var(--ink);
+            transition:width .8s cubic-bezier(.16,1,.3,1); }
+.conf .base{ position:absolute; left:0; right:0; top:0; height:3px; background:var(--sunken); }
+.conf .scalelab{ display:flex; justify-content:space-between; font-family:var(--mono);
+                 font-size:9.5px; color:var(--ink-3); margin-top:2px; }
+.band{ display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:10.5px;
+       padding:2px 7px; border-radius:2px; }
+.band.lo{ background:var(--amber-s); color:var(--amber); }
+.band.hi{ background:var(--blue-s); color:var(--blue); }
+
+/* meters (severity, features) */
+.meter{ height:3px; background:var(--sunken); border-radius:2px; overflow:hidden; }
+.meter i{ display:block; height:100%; background:var(--ink); width:0;
+          transition:width .8s cubic-bezier(.16,1,.3,1); }
+.meter.g i{ background:var(--green); } .meter.r i{ background:var(--red); }
+.meter.b i{ background:var(--blue); } .meter.a i{ background:var(--amber); }
+
+/* ============================================================
+   Explainability
+   ============================================================ */
+.xai{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+@media (max-width:820px){ .xai{ grid-template-columns:1fr; } }
+.xai .tile{ aspect-ratio:1/1; }
+.xai figcaption{ display:flex; justify-content:space-between; gap:8px; margin-top:9px; }
+.xai figcaption .t{ font-size:13px; font-variation-settings:'wdth' 94,'wght' 560; }
+.xai figcaption p{ font-size:12px; color:var(--ink-3); margin-top:3px; line-height:1.45; }
+.feat{ display:grid; gap:0; }
+.feat .f{ display:grid; grid-template-columns:minmax(0,1fr) 84px 52px; gap:14px; align-items:center;
+          padding:11px 0; border-bottom:1px solid var(--line); }
+.feat .f:last-child{ border-bottom:0; }
+.feat .f .nm{ font-size:13.5px; }
+.feat .f .nm span{ display:block; font-size:11.5px; color:var(--ink-3); margin-top:2px; }
+.feat .f .vv{ font-family:var(--mono); font-size:12px; text-align:right; color:var(--ink-2); }
+@media (max-width:560px){ .feat .f{ grid-template-columns:minmax(0,1fr) 46px; }
+  .feat .f .meter{ display:none } }
+.why{ border-left:2px solid var(--blue); padding:2px 0 2px 16px; }
+.why p{ font-size:14px; line-height:1.6; color:var(--ink); max-width:58ch; }
+.why .src{ font-family:var(--mono); font-size:10.5px; color:var(--ink-3); margin-top:9px; }
+
+/* ============================================================
+   5 · Insights
+   ============================================================ */
+.metrics{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border-block:1px solid var(--line); }
+.metrics .m{ padding:26px 24px 28px; border-right:1px solid var(--line); position:relative; }
+.metrics .m:last-child{ border-right:0; }
+.metrics .m .v{ font-family:var(--mono); font-size:clamp(30px,3.4vw,44px); font-weight:500;
+                letter-spacing:-.035em; line-height:1; display:block; }
+.metrics .m .v s{ text-decoration:none; font-size:.5em; color:var(--ink-3); margin-left:2px; }
+.metrics .m .k{ font-size:13px; margin-top:9px; }
+.metrics .m .d{ font-size:11.5px; color:var(--ink-3); margin-top:4px; line-height:1.45; }
+@media (max-width:860px){ .metrics{ grid-template-columns:1fr 1fr; }
+  .metrics .m{ border-bottom:1px solid var(--line); } .metrics .m:nth-child(2n){ border-right:0 } }
+
+.cm{ display:grid; grid-template-columns:96px 1fr 1fr; grid-template-rows:auto 1fr 1fr; gap:1px;
+     background:var(--line); border:1px solid var(--line); }
+.cm > *{ background:var(--paper); padding:14px 16px; }
+.cm .hd{ font-family:var(--mono); font-size:10.5px; color:var(--ink-3); display:flex; align-items:flex-end; }
+.cm .cell{ position:relative; min-height:104px; display:flex; flex-direction:column; justify-content:flex-end; }
+.cm .cell .v{ font-family:var(--mono); font-size:30px; font-weight:500; letter-spacing:-.03em; line-height:1; }
+.cm .cell .k{ font-size:11.5px; color:var(--ink-3); margin-top:6px; }
+.cm .cell .pct{ font-family:var(--mono); font-size:10.5px; color:var(--ink-3); position:absolute; top:14px; right:16px; }
+.cm .cell::before{ content:''; position:absolute; inset:0; background:currentColor; opacity:var(--d,0); }
+.cm .cell.good{ color:var(--green); } .cm .cell.bad{ color:var(--red); }
+.cm .cell .v,.cm .cell .k,.cm .cell .pct{ position:relative; }
+.cm .cell.good .v{ color:var(--green); } .cm .cell.bad .v{ color:var(--red); }
+
+.dist{ display:grid; gap:0; }
+.dist .d{ display:grid; grid-template-columns:120px minmax(0,1fr) 92px; gap:16px; align-items:center;
+          padding:13px 0; border-bottom:1px solid var(--line); }
+.dist .d:last-child{ border-bottom:0; }
+.dist .d .nm{ font-size:13.5px; }
+.dist .bars{ display:flex; height:22px; border-radius:2px; overflow:hidden; background:var(--sunken); }
+.dist .bars i{ display:block; height:100%; }
+.dist .bars .n{ background:var(--green); opacity:.55; }
+.dist .bars .p{ background:var(--red); opacity:.55; }
+.dist .d .tot{ font-family:var(--mono); font-size:12px; text-align:right; color:var(--ink-2); }
+.dist .d.placeholder{ color:var(--ink-3); }
+.dist .d.placeholder .bars{ background:repeating-linear-gradient(45deg,var(--sunken),var(--sunken) 5px,transparent 5px,transparent 10px); }
+@media (max-width:640px){ .dist .d{ grid-template-columns:1fr 72px; } .dist .bars{ grid-column:1/-1; } }
+
+.spec{ display:grid; gap:0; max-width:620px; }
+.spec .r{ display:grid; grid-template-columns:150px minmax(0,1fr); gap:20px; padding:11px 0;
+          border-bottom:1px solid var(--line); font-size:13.5px; }
+.spec .r:last-child{ border-bottom:0; }
+.spec .r dt{ color:var(--ink-3); font-size:12.5px; }
+.spec .r dd{ margin:0; font-family:var(--mono); font-size:12.5px; }
+
+/* ============================================================
+   6 · History
+   ============================================================ */
+.tbl{ width:100%; border-collapse:collapse; }
+.tbl th{ text-align:left; font-family:var(--mono); font-size:10.5px; font-weight:500; color:var(--ink-3);
+         padding:0 14px 10px 0; border-bottom:1px solid var(--line-2); white-space:nowrap; }
+.tbl td{ padding:12px 14px 12px 0; border-bottom:1px solid var(--line); vertical-align:middle; font-size:13.5px; }
+.tbl tr.row{ transition:background .13s; }
+.tbl tr.row:hover{ background:var(--raised); }
+.tbl .thumb{ width:44px; height:44px; border-radius:2px; overflow:hidden; background:var(--slab); }
+.tbl .thumb svg,.tbl .thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+.tag{ display:inline-flex; align-items:center; gap:6px; height:22px; padding:0 8px; border-radius:2px;
+      font-family:var(--mono); font-size:10.5px; }
+.tag.n{ background:var(--green-s); color:var(--green); }
+.tag.p{ background:var(--red-s); color:var(--red); }
+.tag.q{ background:var(--amber-s); color:var(--amber); }
+.tag.i{ background:var(--blue-s); color:var(--blue); }
+.confcell{ display:flex; align-items:center; gap:10px; min-width:120px; }
+.confcell .meter{ flex:1; }
+.open{ opacity:0; font-family:var(--mono); font-size:11px; color:var(--blue); transition:opacity .13s; }
+.tbl tr.row:hover .open{ opacity:1; }
+@media (max-width:760px){ .tbl thead{ display:none }
+  .tbl td{ display:block; border:0; padding:3px 0 }
+  .tbl tr.row{ display:grid; grid-template-columns:44px 1fr; gap:4px 14px; padding:14px 0;
+               border-bottom:1px solid var(--line); align-items:center }
+  .tbl td:first-child{ grid-row:span 4 } }
+
+/* ============================================================
+   7 · Dataset
+   ============================================================ */
+.seg{ display:inline-flex; border:1px solid var(--line-2); border-radius:3px; overflow:hidden; }
+.seg button{ padding:0 15px; height:32px; font-family:var(--mono); font-size:11px; color:var(--ink-2);
+             border-right:1px solid var(--line); transition:.14s; }
+.seg button:last-child{ border-right:0; }
+.seg button[aria-pressed="true"]{ background:var(--ink); color:var(--paper); }
+.gal{ display:grid; grid-template-columns:repeat(auto-fill,minmax(172px,1fr)); gap:14px; }
+.gcard{ display:block; text-align:left; width:100%; }
+.gcard .slab{ aspect-ratio:4/5; transition:transform .2s cubic-bezier(.2,.7,.3,1); }
+.gcard:hover .slab{ transform:translateY(-3px); }
+.gcard .meta{ display:flex; justify-content:space-between; align-items:center; margin-top:9px; gap:8px; }
+.gcard .id{ font-family:var(--mono); font-size:11px; color:var(--ink-3); }
+
+/* ============================================================
+   States
+   ============================================================ */
+.empty{ border:1px dashed var(--line-2); border-radius:3px; padding:44px 28px; text-align:center; }
+.empty h4{ font-size:16px; font-variation-settings:'wdth' 92,'wght' 600; margin:0 0 7px; }
+.empty p{ font-size:13px; color:var(--ink-3); max-width:40ch; margin:0 auto 18px; line-height:1.55; }
+.errbox{ border:1px solid color-mix(in srgb,var(--red) 40%,transparent); background:var(--red-s);
+         border-radius:3px; padding:15px 17px; display:flex; gap:13px; align-items:flex-start; }
+.errbox svg{ width:17px; height:17px; color:var(--red); flex:none; margin-top:1px; stroke-width:1.7; }
+.errbox h5{ margin:0 0 4px; font-size:13.5px; font-variation-settings:'wdth' 94,'wght' 600; color:var(--red); }
+.errbox p{ font-size:12.5px; color:var(--ink-2); line-height:1.5; }
+.skel{ background:linear-gradient(90deg,var(--sunken) 25%,var(--raised) 50%,var(--sunken) 75%);
+       background-size:200% 100%; animation:shim 1.4s linear infinite; border-radius:2px; }
+@keyframes shim{ to{ background-position:-200% 0 } }
+
+.toast{ position:fixed; left:50%; bottom:calc(22px + env(safe-area-inset-bottom,0px)); translate:-50% 0;
+        z-index:80; background:var(--ink); color:var(--paper); border-radius:3px; padding:11px 16px;
+        font-size:13px; display:flex; gap:11px; align-items:center; box-shadow:0 18px 40px -16px rgba(0,0,0,.5);
+        opacity:0; pointer-events:none; transition:opacity .22s, translate .22s; }
+.toast.on{ opacity:1; translate:-50% -6px; }
+.toast .lab{ color:rgba(255,255,255,.55); }
+
+.disclaimer{ display:flex; gap:12px; align-items:flex-start; padding:16px 0; border-top:1px solid var(--line-2); }
+.disclaimer svg{ width:15px; height:15px; color:var(--amber); flex:none; margin-top:2px; stroke-width:1.7; }
+.disclaimer p{ font-size:12.5px; color:var(--ink-2); max-width:70ch; line-height:1.55; }
+
+.hidden{ display:none !important; }
+.scrollx{ overflow-x:auto; }
+
+/* mobile rail → bottom bar */
+@media (max-width:720px){
+  .app{ grid-template-columns:1fr; }
+  .rail{ position:fixed; bottom:0; left:0; right:0; top:auto; height:auto; width:100%;
+         flex-direction:row; justify-content:space-around; border-right:0; border-top:1px solid var(--line);
+         padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px)); z-index:60; }
+  .mark,.rail-foot{ display:none; }
+  .nav{ flex-direction:row; justify-content:space-around; }
+  .navbtn[aria-current="page"]::before{ left:12px; right:12px; top:auto; bottom:-6px; width:auto; height:2px; }
+  .navbtn .tip{ display:none; }
+  .main{ padding-bottom:64px; }
+  .hero{ grid-template-columns:1fr; padding-right:var(--pad); }
+  .hero-slab{ border-radius:4px; aspect-ratio:4/3; order:-1; }
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{ animation-duration:.001ms !important; animation-iteration-count:1 !important;
+                        transition-duration:.001ms !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ══ rail ══ -->
+  <aside class="rail">
+    <div class="mark" title="PNEUMA">
+      <svg viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <path d="M13 2v22" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M13 6C9.5 6 4 9 4 15c0 4 1.6 6 3.8 6 2 0 3.2-1.3 3.6-3.4.4-2.2.6-5 .6-8.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M13 6c3.5 0 9 3 9 9 0 4-1.6 6-3.8 6-2 0-3.2-1.3-3.6-3.4-.4-2.2-.6-5-.6-8.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <nav class="nav" aria-label="Sections">
+      <button class="navbtn" data-go="overview" aria-current="page" aria-label="Overview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19V9l8-5 8 5v10" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 19h16" stroke-linecap="round"/></svg>
+        <span class="tip">Overview</span>
+      </button>
+      <button class="navbtn" data-go="workspace" aria-label="Workspace">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M8 3.5v17M16 3.5v17M3.5 9h17M3.5 15h17" opacity=".5"/></svg>
+        <span class="tip">Workspace</span>
+      </button>
+      <button class="navbtn" data-go="insights" aria-label="Model insights">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 20V9M10 20V4M16 20v-7M22 20H2" stroke-linecap="round"/></svg>
+        <span class="tip">Model insights</span>
+      </button>
+      <button class="navbtn" data-go="history" aria-label="History">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="tip">History</span>
+      </button>
+      <button class="navbtn" data-go="dataset" aria-label="Dataset">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3.5" y="3.5" width="7" height="7" rx="1"/><rect x="13.5" y="3.5" width="7" height="7" rx="1"/><rect x="3.5" y="13.5" width="7" height="7" rx="1"/><rect x="13.5" y="13.5" width="7" height="7" rx="1"/></svg>
+        <span class="tip">Dataset</span>
+      </button>
+    </nav>
+    <div class="rail-foot">
+      <span class="vert">rf&nbsp;v0.3</span>
+      <span class="pulse" title="Live API responding"></span>
+    </div>
+  </aside>
+
+  <div class="main">
+
+    <!-- ══ top bar ══ -->
+    <header class="topbar">
+      <span class="where"><b>Pneuma</b> <span id="crumb">Overview</span></span>
+      <span class="spacer"></span>
+      <span class="chip" id="srcChip"><span class="dot" style="color:var(--blue)"></span>Live API</span>
+      <span class="chip warn">Prototype — not for clinical use</span>
+      <button class="iconbtn" id="themeBtn" aria-label="Switch appearance">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z" stroke-linejoin="round"/></svg>
+      </button>
+    </header>
+
+    <!-- ════════════════════════════════════════════
+         1 · OVERVIEW
+         ════════════════════════════════════════════ -->
+    <section class="view" id="v-overview">
+      <div class="hero">
+        <div class="hero-copy">
+          <h1 class="display">See what the image reveals.</h1>
+          <p class="lede">Pneuma reads a chest radiograph, returns a NORMAL or PNEUMONIA
+            classification with its probability, and shows you which regions of the film
+            moved the decision.</p>
+          <div class="hero-actions">
+            <button class="btn btn-primary" data-go="workspace">Analyze an X-ray <kbd>A</kbd></button>
+            <button class="btn btn-ghost" data-go="insights">How the model performs</button>
+          </div>
+          <div class="hero-note">
+            <p>Random-forest classifier over image-derived features. Test accuracy 68.59% on a
+              624-image held-out split — useful for research and teaching, not for diagnosis.</p>
+          </div>
+        </div>
+
+        <div class="slab hero-slab" id="heroSlab">
+          <div class="film" id="heroFilm"></div>
+          <div class="attr on" id="heroAttr"></div>
+          <div class="scan" style="opacity:1"><div class="sweep"></div></div>
+          <span class="brk a"></span><span class="brk b"></span><span class="brk c"></span><span class="brk d"></span>
+          <div class="burn tl"><b>PNEUMA</b>SPECIMEN FILM · SYNTHETIC</div>
+          <div class="burn tr">PA UPRIGHT<b>1024 × 1280</b></div>
+          <div class="burn bl">W 2048 &nbsp; L 1024</div>
+          <div class="burn br" id="heroBurn">ATTRIBUTION ON</div>
+        </div>
+      </div>
+
+      <div class="statstrip">
+        <div class="stat"><span class="v">68.59<s style="font-size:.5em;color:var(--ink-3)">%</s></span>
+          <span class="k">Accuracy</span><span class="s">held-out test split</span></div>
+        <div class="stat"><span class="v">73.21<s style="font-size:.5em;color:var(--ink-3)">%</s></span>
+          <span class="k">Precision</span><span class="s">pneumonia class</span></div>
+        <div class="stat"><span class="v">78.46<s style="font-size:.5em;color:var(--ink-3)">%</s></span>
+          <span class="k">Recall</span><span class="s">pneumonia class</span></div>
+        <div class="stat"><span class="v">75.74<s style="font-size:.5em;color:var(--ink-3)">%</s></span>
+          <span class="k">F1</span><span class="s">harmonic mean</span></div>
+      </div>
+
+      <div class="section pad">
+        <div class="ledger">
+          <div class="side">
+            <span class="lab">The read</span>
+            <p>Three stages between an uploaded film and an explained result.</p>
+          </div>
+          <div>
+            <div class="steps">
+              <div class="step">
+                <span class="n">First</span>
+                <h4>The film goes on the box</h4>
+                <p>Drop a radiograph or pick a specimen. Window it with brightness and contrast,
+                   zoom and pan — the image stays the largest thing on screen.</p>
+              </div>
+              <div class="step">
+                <span class="n">Then</span>
+                <h4>Features, then a vote</h4>
+                <p>The image is resampled and normalised, intensity and texture descriptors are
+                   extracted, and the forest votes. You watch each step as it happens.</p>
+              </div>
+              <div class="step">
+                <span class="n">Finally</span>
+                <h4>A result you can interrogate</h4>
+                <p>Class, probability, confidence band, the regions that carried weight and the
+                   features behind them — all on the same screen as the film.</p>
+              </div>
+            </div>
+            <div class="disclaimer" style="margin-top:38px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 9v5" stroke-linecap="round"/><circle cx="12" cy="17.2" r=".9" fill="currentColor" stroke="none"/><path d="M10.3 3.9 2.7 17.5A2 2 0 0 0 4.4 20.5h15.2a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke-linejoin="round"/></svg>
+              <p>Pneuma is a research prototype. Its output is not a diagnosis, the severity index is
+                 image-derived and has no clinical meaning, and every film shown in this build is
+                 synthetic. Do not use it to make care decisions.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════════════════════════════════════════
+         2 · WORKSPACE
+         ════════════════════════════════════════════ -->
+    <section class="view hidden" id="v-workspace">
+      <div class="work">
+        <div class="work-left">
+
+          <div class="slab viewer" id="viewer">
+            <div class="stage grab" id="stage">
+              <div class="film-wrap" id="filmWrap"><div class="film" id="film"></div></div>
+            </div>
+            <div class="attr" id="attrLayer"></div>
+            <div class="scan"><div class="grid"></div><div class="sweep"></div></div>
+
+            <div class="dz" id="dropzone">
+              <div class="dz-inner">
+                <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/>
+                  <path d="M3 16l4.5-4.5a2 2 0 0 1 2.8 0L15 16" stroke-linecap="round" stroke-linejoin="round"/>
+                  <circle cx="15.5" cy="8.5" r="1.6"/>
+                </svg>
+                <h4>Put a chest radiograph on the box</h4>
+                <p>Drag a PA or AP film here, or browse for one. JPEG or PNG, up to 12&nbsp;MB.</p>
+                <div class="or">or</div>
+                <button class="linkbtn" id="useSample">Load a specimen film instead</button>
+              </div>
+            </div>
+
+            <span class="brk a"></span><span class="brk b"></span><span class="brk c"></span><span class="brk d"></span>
+            <div class="burn tl" id="burnTL"><b>PNEUMA</b>NO STUDY LOADED</div>
+            <div class="burn tr" id="burnTR">RF v0.3<b id="burnStudy">—</b></div>
+            <div class="burn bl" id="burnBL">ZOOM 100%</div>
+            <div class="burn br" id="burnBR">W 2048 &nbsp; L 1024</div>
+
+            <div class="toolbar" role="toolbar" aria-label="Viewer controls">
+              <button class="tb" data-z="-" aria-label="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12h14" stroke-linecap="round"/></svg></button>
+              <span class="zoomval num" id="zoomVal">100%</span>
+              <button class="tb" data-z="+" aria-label="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg></button>
+              <button class="tb" data-z="fit" aria-label="Fit to view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              <span class="tb-sep"></span>
+              <div class="slider"><label for="bright">Br</label><input id="bright" type="range" min="40" max="180" value="100"></div>
+              <div class="slider"><label for="contrast">Ct</label><input id="contrast" type="range" min="40" max="220" value="100"></div>
+              <span class="tb-sep"></span>
+              <button class="tb" id="invertBtn" aria-pressed="false" aria-label="Invert greyscale"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17a8.5 8.5 0 0 0 0-17Z" fill="currentColor" stroke="none"/></svg></button>
+              <button class="tb" id="attrBtn" aria-pressed="false" aria-label="Toggle region attribution"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" stroke-linejoin="round"/><circle cx="12" cy="12" r="2.8"/></svg></button>
+              <button class="tb" id="resetBtn" aria-label="Reset windowing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 12a8 8 0 1 1 2.6 5.9" stroke-linecap="round"/><path d="M4 18v-5h5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:16px">
+            <div class="samples" id="sampleRow">
+              <span class="lab" style="margin-right:4px">Specimens</span>
+            </div>
+            <div style="display:flex;gap:9px">
+              <button class="btn btn-ghost btn-sm" id="browseBtn">Browse files</button>
+              <button class="btn btn-ghost btn-sm" id="clearBtn" disabled>Clear</button>
+            </div>
+            <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp" hidden>
+          </div>
+
+          <div id="uploadErr" class="hidden" style="margin-top:14px">
+            <div class="errbox">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5" stroke-linecap="round"/><circle cx="12" cy="16.4" r=".9" fill="currentColor" stroke="none"/></svg>
+              <div><h5 id="errTitle">That file can't be read as a radiograph</h5>
+                <p id="errBody">Pneuma accepts single-frame JPEG, PNG or WebP images up to 12 MB. Export the study to an image and try again.</p></div>
+            </div>
+          </div>
+
+          <!-- explainability -->
+          <div class="section" id="xaiSection" style="padding-bottom:20px">
+            <hr class="rule" style="margin-bottom:28px">
+            <div class="ledger">
+              <div class="side">
+                <span class="lab">Explainability</span>
+                <p>What the classifier looked at, and how much each descriptor moved the vote.</p>
+              </div>
+              <div>
+                <div id="xaiEmpty">
+                  <div class="empty">
+                    <h4>Nothing to explain yet</h4>
+                    <p>Run an analysis and this section fills with the processed film, the regions
+                       that carried weight, and the feature contributions behind them.</p>
+                  </div>
+                </div>
+
+                <div id="xaiBody" class="hidden">
+                  <div class="xai">
+                    <figure style="margin:0">
+                      <div class="slab tile"><div class="film" id="xaiA"></div>
+                        <div class="burn tl">SOURCE</div></div>
+                      <figcaption><div><span class="t">As uploaded</span>
+                        <p>Original film, unwindowed.</p></div></figcaption>
+                    </figure>
+                    <figure style="margin:0">
+                      <div class="slab tile"><div class="film" id="xaiB" style="filter:grayscale(1) contrast(1.28) brightness(1.06)"></div>
+                        <div class="burn tl">PROCESSED</div><div class="burn br">224 × 224</div></div>
+                      <figcaption><div><span class="t">Model input</span>
+                        <p>Resampled to 224 × 224, greyscale, intensity-normalised.</p></div></figcaption>
+                    </figure>
+                    <figure style="margin:0">
+                      <div class="slab tile"><div class="film" id="xaiC"></div>
+                        <div class="attr on" id="xaiAttr"></div>
+                        <div class="burn tl">ATTRIBUTION</div><div class="burn br" id="xaiBurn">2 REGIONS</div></div>
+                      <figcaption><div><span class="t">Region attribution</span>
+                        <p>Patch-level contribution map. Prototype method, not Grad-CAM.</p></div></figcaption>
+                    </figure>
+                  </div>
+
+                  <div class="why" style="margin:34px 0 30px"><p id="whyText"></p>
+                    <p class="src" id="whySrc">Generated from the Live API. Replace with the <code>/explain</code> response.</p></div>
+
+                  <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px">
+                    <h3 class="h3">Feature contributions</h3>
+                    <span class="lab">placeholder names — awaiting backend schema</span>
+                  </div>
+                  <div class="feat" id="featList"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- right analysis panel -->
+        <aside class="work-right" aria-label="Analysis">
+          <div class="panel-sec" style="padding-top:22px">
+            <div class="panel-head">
+              <h3 class="h3">Analysis</h3>
+              <span class="chip" id="stateChip"><span class="dot" style="color:var(--ink-3)"></span>Idle</span>
+            </div>
+            <ul class="pipe" id="pipe"></ul>
+            <button class="btn btn-primary" id="runBtn" style="width:100%;margin-top:16px" disabled>Analyze X-ray</button>
+            <p class="lab" style="margin-top:10px;line-height:1.5">Results come from a Live API.
+              Point <code>analyzeImage()</code> at your Python service to use the real forest.</p>
+          </div>
+
+          <div id="resultEmpty" class="panel-sec">
+            <p style="font-size:13px;color:var(--ink-3);line-height:1.6">
+              No result yet. The classification, its probability split and the confidence band
+              will appear here once the forest has voted.</p>
+          </div>
+
+          <div id="resultBody" class="hidden">
+            <div class="verdict" id="verdict" data-c="NORMAL">
+              <span class="lab">Classification</span>
+              <p class="word" id="verdictWord">NORMAL</p>
+              <p class="sub" id="verdictSub"></p>
+            </div>
+
+            <div class="panel-sec">
+              <div class="panel-head"><h3 class="h3">Confidence</h3>
+                <span class="band hi" id="confBand">high</span></div>
+              <div class="conf">
+                <div class="row"><span class="big num" id="confBig">0.0%</span>
+                  <span class="lab" id="confMargin"></span></div>
+                <div class="ticks" id="confTicks"><div class="base"></div><div class="bar" id="confBar"></div></div>
+                <div class="scalelab"><span>50</span><span>60</span><span>70</span><span>80</span><span>90</span><span>100</span></div>
+              </div>
+            </div>
+
+            <div class="panel-sec">
+              <div class="panel-head"><h3 class="h3">Class probability</h3></div>
+              <div class="axis">
+                <div class="ends"><span class="n">Normal</span><span class="p">Pneumonia</span></div>
+                <div class="track">
+                  <span class="fillN" id="fillN"></span><span class="fillP" id="fillP"></span>
+                  <span class="mid"></span><span class="needle" id="needle" style="left:50%"></span>
+                </div>
+                <div class="vals"><span class="num" id="pN">—</span><span class="num" id="pP">—</span></div>
+              </div>
+            </div>
+
+            <div class="panel-sec">
+              <div class="panel-head"><h3 class="h3">Severity index</h3>
+                <span class="lab">prototype</span></div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:9px">
+                <span class="num" id="sevVal" style="font-size:22px">—</span>
+                <span class="lab" id="sevWord"></span>
+              </div>
+              <div class="meter a"><i id="sevBar"></i></div>
+              <p class="lab" style="margin-top:10px;line-height:1.5">Derived from image statistics only.
+                It is not a clinical severity score and must not be read as one.</p>
+            </div>
+
+            <div class="panel-sec" style="border-bottom:0">
+              <button class="btn btn-ghost btn-sm" id="jumpXai" style="width:100%">See the explanation</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ════════════════════════════════════════════
+         3 · INSIGHTS
+         ════════════════════════════════════════════ -->
+    <section class="view hidden" id="v-insights">
+      <div class="pad" style="padding-top:clamp(30px,4vw,56px)">
+        <div class="ledger">
+          <div class="side"><span class="lab">Model card</span>
+            <p>Reported figures for the current build of the classifier.</p></div>
+          <div>
+            <h2 class="h2" style="max-width:20ch">The forest is right about two films in three.</h2>
+            <p class="prose" style="margin-top:14px;font-size:15px">Every number on this page comes from
+              one held-out test split. Recall is higher than precision, so the model over-calls
+              pneumonia rather than missing it — the safer failure for a screening aid, and a real
+              limitation for anything else.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="metrics" style="margin-top:clamp(28px,3.4vw,46px)">
+        <div class="m"><span class="v">68.59<s>%</s></span><span class="k">Accuracy</span>
+          <span class="d">428 of 624 films classified correctly.</span></div>
+        <div class="m"><span class="v">73.21<s>%</s></span><span class="k">Precision</span>
+          <span class="d">Of films called pneumonia, this share truly were.</span></div>
+        <div class="m"><span class="v">78.46<s>%</s></span><span class="k">Recall</span>
+          <span class="d">Of true pneumonia films, this share were caught.</span></div>
+        <div class="m"><span class="v">75.74<s>%</s></span><span class="k">F1</span>
+          <span class="d">Balance of the two above.</span></div>
+      </div>
+
+      <div class="section pad">
+        <div class="ledger">
+          <div class="side"><span class="lab">Confusion matrix</span>
+            <p>Counts derived from the reported metrics on the 624-film split. Replace with the
+               backend's own counts when <code>/metrics</code> is wired.</p></div>
+          <div>
+            <div class="scrollx">
+              <div class="cm" style="min-width:420px">
+                <div class="hd"></div>
+                <div class="hd">Predicted normal</div>
+                <div class="hd">Predicted pneumonia</div>
+
+                <div class="hd" style="align-items:center">Actually<br>normal</div>
+                <div class="cell good" style="--d:.10"><span class="pct num">52.1%</span>
+                  <span class="v num">122</span><span class="k">True negative</span></div>
+                <div class="cell bad" style="--d:.07"><span class="pct num">47.9%</span>
+                  <span class="v num">112</span><span class="k">False positive — healthy film called pneumonia</span></div>
+
+                <div class="hd" style="align-items:center">Actually<br>pneumonia</div>
+                <div class="cell bad" style="--d:.05"><span class="pct num">21.5%</span>
+                  <span class="v num">84</span><span class="k">False negative — missed pneumonia</span></div>
+                <div class="cell good" style="--d:.16"><span class="pct num">78.5%</span>
+                  <span class="v num">306</span><span class="k">True positive</span></div>
+              </div>
+            </div>
+            <p class="prose" style="margin-top:18px;font-size:13.5px">Nearly half of all healthy films
+              are called pneumonia. That single cell is the model's main weakness and the reason
+              this build is labelled a prototype.</p>
+          </div>
+        </div>
+      </div>
+
+      <hr class="rule">
+
+      <div class="section pad">
+        <div class="ledger">
+          <div class="side"><span class="lab">Dataset</span>
+            <p>Class balance per split. Train and validation counts are not available from this
+               build — they will populate from <code>/dataset/summary</code>.</p></div>
+          <div>
+            <div class="dist">
+              <div class="d"><span class="nm">Test split</span>
+                <div class="bars"><i class="n" style="width:37.5%"></i><i class="p" style="width:62.5%"></i></div>
+                <span class="tot num">624</span></div>
+              <div class="d placeholder"><span class="nm">Train split</span>
+                <div class="bars"></div><span class="tot num">—</span></div>
+              <div class="d placeholder"><span class="nm">Validation split</span>
+                <div class="bars"></div><span class="tot num">—</span></div>
+            </div>
+            <div style="display:flex;gap:22px;margin-top:16px">
+              <span class="lab" style="display:flex;align-items:center;gap:7px">
+                <i style="width:9px;height:9px;background:var(--green);opacity:.55;border-radius:1px"></i>Normal · 234</span>
+              <span class="lab" style="display:flex;align-items:center;gap:7px">
+                <i style="width:9px;height:9px;background:var(--red);opacity:.55;border-radius:1px"></i>Pneumonia · 390</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="rule">
+
+      <div class="section pad">
+        <div class="ledger">
+          <div class="side"><span class="lab">Specification</span><p>What is actually running.</p></div>
+          <div>
+            <dl class="spec">
+              <div class="r"><dt>Algorithm</dt><dd>Random forest classifier</dd></div>
+              <div class="r"><dt>Input</dt><dd>Single-frame chest radiograph</dd></div>
+              <div class="r"><dt>Output</dt><dd>NORMAL | PNEUMONIA + probability</dd></div>
+              <div class="r"><dt>Feature set</dt><dd>image-derived — schema pending</dd></div>
+              <div class="r"><dt>Probability calibration</dt><dd>none applied</dd></div>
+              <div class="r"><dt>Explainability</dt><dd>patch contribution (prototype)</dd></div>
+              <div class="r"><dt>Severity index</dt><dd>image-derived, non-clinical</dd></div>
+              <div class="r"><dt>Test split</dt><dd>624 films — 234 normal, 390 pneumonia</dd></div>
+              <div class="r"><dt>Regulatory status</dt><dd>none — research use only</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════════════════════════════════════════
+         4 · HISTORY
+         ════════════════════════════════════════════ -->
+    <section class="view hidden" id="v-history">
+      <div class="pad" style="padding-top:clamp(30px,4vw,52px);padding-bottom:20px">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap">
+          <div>
+            <h2 class="h2">Analysis history</h2>
+            <p class="prose" style="margin-top:10px;font-size:14px">Every run from this browser,
+              newest first. Stored locally; nothing leaves the device in this build.</p>
+          </div>
+          <div style="display:flex;gap:9px">
+            <button class="btn btn-ghost btn-sm" id="seedHist">Load sample runs</button>
+            <button class="btn btn-ghost btn-sm" id="clearHist">Clear history</button>
+          </div>
+        </div>
+      </div>
+      <div class="pad" style="padding-bottom:60px">
+        <div id="histEmpty" class="empty hidden">
+          <h4>No analyses yet</h4>
+          <p>Runs you complete in the workspace are listed here with their film, classification and
+             confidence.</p>
+          <button class="btn btn-primary btn-sm" data-go="workspace">Analyze an X-ray</button>
+        </div>
+        <div class="scrollx" id="histWrap">
+          <table class="tbl" style="min-width:680px">
+            <thead><tr>
+              <th style="width:44px"></th><th>Study</th><th>Recorded</th><th>Classification</th>
+              <th style="width:170px">Confidence</th><th>Status</th><th style="width:60px"></th>
+            </tr></thead>
+            <tbody id="histBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════════════════════════════════════════
+         5 · DATASET
+         ════════════════════════════════════════════ -->
+    <section class="view hidden" id="v-dataset">
+  <div class="pad" style="padding-top:clamp(30px,4vw,52px);padding-bottom:22px">
+
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap">
+      <div>
+        <div class="eyebrow">DATASET</div>
+        <h2 class="h2">Chest X-ray dataset</h2>
+        <p class="prose" style="margin-top:10px;font-size:14px">
+          Pediatric chest X-ray images used for binary classification of
+          NORMAL and PNEUMONIA cases.
+        </p>
+      </div>
+
+      <div class="seg">
+        <button aria-pressed="true">TRAIN + TEST</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="pad" style="padding-bottom:64px">
+
+    <div class="gal" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">
+
+      <div class="gcard" style="padding:20px;border:1px solid var(--line-2);border-radius:4px">
+        <div class="eyebrow">TRAINING SET</div>
+        <div style="font-size:34px;font-family:var(--mono);margin-top:10px">
+          5,216
+        </div>
+        <div class="prose" style="margin-top:6px">
+          chest X-ray images
+        </div>
+      </div>
+
+      <div class="gcard" style="padding:20px;border:1px solid var(--line-2);border-radius:4px">
+        <div class="eyebrow">NORMAL</div>
+        <div style="font-size:34px;font-family:var(--mono);margin-top:10px">
+          1,341
+        </div>
+        <div class="prose" style="margin-top:6px">
+          training images
+        </div>
+      </div>
+
+      <div class="gcard" style="padding:20px;border:1px solid var(--line-2);border-radius:4px">
+        <div class="eyebrow">PNEUMONIA</div>
+        <div style="font-size:34px;font-family:var(--mono);margin-top:10px">
+          3,875
+        </div>
+        <div class="prose" style="margin-top:6px">
+          training images
+        </div>
+      </div>
+
+      <div class="gcard" style="padding:20px;border:1px solid var(--line-2);border-radius:4px">
+        <div class="eyebrow">OFFICIAL TEST SET</div>
+        <div style="font-size:34px;font-family:var(--mono);margin-top:10px">
+          624
+        </div>
+        <div class="prose" style="margin-top:6px">
+          held-out test images
+        </div>
+      </div>
+
+    </div>
+
+    <div style="margin-top:22px;border:1px solid var(--line-2);padding:22px">
+
+      <div class="eyebrow">TEST DISTRIBUTION</div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:18px;margin-top:18px">
+
+        <div>
+          <div class="prose">NORMAL</div>
+          <div style="font-family:var(--mono);font-size:22px;margin-top:5px">
+            234
+          </div>
+        </div>
+
+        <div>
+          <div class="prose">PNEUMONIA</div>
+          <div style="font-family:var(--mono);font-size:22px;margin-top:5px">
+            390
+          </div>
+        </div>
+
+        <div>
+          <div class="prose">TOTAL</div>
+          <div style="font-family:var(--mono);font-size:22px;margin-top:5px">
+            624
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <div style="margin-top:22px;padding:18px;border-left:2px solid var(--line-2)">
+      <div class="eyebrow">PIPELINE NOTE</div>
+      <p class="prose" style="margin-top:8px;font-size:13px">
+        Images are converted to grayscale and resized to 512 × 512 pixels.
+        Image-derived intensity and regional area features are extracted
+        before Random Forest classification.
+      </p>
+    </div>
+
+  </div>
+</section>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="lab" id="toastLab">Done</span><span id="toastMsg"></span></div>
+
+<script>
+"use strict";
+/* ============================================================================
+   PNEUMA — prototype UI
+   ----------------------------------------------------------------------------
+   § 1  Synthetic radiograph renderer (no remote images are used anywhere)
+   § 2  API seam — the ONLY place that talks to a backend
+   § 3  Shell: routing, theme, toasts
+   § 4  Workspace: viewer, windowing, upload
+   § 5  Analysis flow + result rendering
+   § 6  Explainability
+   § 7  History
+   § 8  Dataset gallery
+   ========================================================================== */
+
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const pct = n => (n * 100).toFixed(1) + "%";
+
+/* ═══════════════════════ § 1 · radiograph renderer ═══════════════════════ */
+function prng(seed) {
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+let uidN = 0;
+/** Renders a stylised PA chest film as inline SVG. */
+function radiograph({ seed = 1, finding = "NORMAL", severity = 0.5 } = {}) {
+  const r = prng(seed), u = "x" + (++uidN);
+  const j = (m) => (r() - 0.5) * m;
+
+  // ribs: nine pairs, mirrored about the spine
+  let ribs = "";
+  for (let i = 0; i < 9; i++) {
+    const y0 = 116 + i * 25 + j(3);
+    const y1 = y0 + 52 + i * 4;
+    const x1 = 200 - (92 + i * 3.4 + j(4));
+    ribs += `<path d="M197 ${y0.toFixed(1)} C 162 ${(y0 - 7).toFixed(1)}, ${(x1 + 22).toFixed(1)} ${(y0 + 6).toFixed(1)}, ${x1.toFixed(1)} ${y1.toFixed(1)}"/>`;
+  }
+  const ribGroup = o =>
+    `<g fill="none" stroke="#dfe9f0" stroke-width="4.4" stroke-linecap="round" opacity="${o}"${
+      o === 0 ? "" : ""}>${ribs}</g>`;
+
+  // vertebral bodies
+  let spine = "";
+  for (let i = 0; i < 13; i++)
+    spine += `<rect x="191" y="${74 + i * 22}" width="18" height="17" rx="3" fill="#cfdde6" opacity="${0.16 + r() * 0.05}"/>`;
+
+  // consolidation for pneumonia films
+  let opac = "";
+  if (finding === "PNEUMONIA") {
+    const n = severity > 0.7 ? 3 : 2;
+    for (let i = 0; i < n; i++) {
+      const left = r() > 0.45;
+      const cx = left ? 120 + j(34) : 282 + j(34);
+      const cy = 290 + r() * 90;
+      const rx = 34 + r() * 22 + severity * 14;
+      opac += `<ellipse cx="${cx.toFixed(0)}" cy="${cy.toFixed(0)}" rx="${rx.toFixed(0)}" ry="${(rx * 0.78).toFixed(0)}" fill="#eef5f9" opacity="${(0.17 + severity * 0.2).toFixed(2)}" filter="url(#b${u})"/>`;
+      for (let k = 0; k < 5; k++)
+        opac += `<circle cx="${(cx + j(rx * 1.5)).toFixed(0)}" cy="${(cy + j(rx * 1.4)).toFixed(0)}" r="${(6 + r() * 11).toFixed(0)}" fill="#f4fafd" opacity="${(0.06 + r() * 0.09).toFixed(2)}" filter="url(#b${u})"/>`;
+    }
+  }
+
+  return `<svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Synthetic chest radiograph, ${finding.toLowerCase()}">
+<defs>
+  <radialGradient id="g${u}" cx="50%" cy="46%" r="62%">
+    <stop offset="0%" stop-color="#b9cfdd" stop-opacity=".30"/>
+    <stop offset="58%" stop-color="#8ea7b6" stop-opacity=".16"/>
+    <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="l${u}" cx="50%" cy="45%" r="55%">
+    <stop offset="0%" stop-color="#000" stop-opacity=".82"/>
+    <stop offset="100%" stop-color="#000" stop-opacity=".18"/>
+  </radialGradient>
+  <filter id="b${u}" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="9"/></filter>
+  <filter id="s${u}" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3"/></filter>
+  <filter id="n${u}"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="${seed}"/>
+    <feColorMatrix type="saturate" values="0"/></filter>
+</defs>
+<rect width="400" height="500" fill="#07080a"/>
+<ellipse cx="200" cy="250" rx="178" ry="238" fill="url(#g${u})"/>
+<path d="M56 96 Q118 58 196 78 L196 96 Z" fill="#c3d6e2" opacity=".14" filter="url(#s${u})"/>
+<path d="M344 96 Q282 58 204 78 L204 96 Z" fill="#c3d6e2" opacity=".14" filter="url(#s${u})"/>
+<ellipse cx="126" cy="252" rx="74" ry="142" fill="url(#l${u})"/>
+<ellipse cx="276" cy="252" rx="74" ry="142" fill="url(#l${u})"/>
+${ribGroup(0.17)}
+<g transform="translate(400,0) scale(-1,1)">${ribGroup(0.17)}</g>
+<rect x="190" y="70" width="20" height="300" fill="#b9cddb" opacity=".10"/>
+${spine}
+<path d="M196 296 C 196 236 214 224 240 232 C 268 240 276 292 262 326 C 248 358 210 356 200 336 Z" fill="#dce9f1" opacity=".16" filter="url(#s${u})"/>
+<path d="M44 392 Q120 344 196 400 L196 468 L44 468 Z" fill="#cfe0ea" opacity=".19" filter="url(#s${u})"/>
+<path d="M356 384 Q284 340 204 396 L204 468 L356 468 Z" fill="#cfe0ea" opacity=".17" filter="url(#s${u})"/>
+${opac}
+<rect width="400" height="500" filter="url(#n${u})" opacity=".055" style="mix-blend-mode:soft-light"/>
+</svg>`;
+}
+
+/** Attribution overlay disabled — current model does not generate clinical heatmaps. */
+function attribution(regions = []) {
+  return "";
+}
+/* ═══════════════════════ § 2 · API seam ═══════════════════════════════════
+   Everything the UI knows about a backend lives in this block. To go live,
+   flip USE_MOCK to false and point API_BASE at your FastAPI/Flask service.
+   The shapes below are the contract the UI renders against.
+   ------------------------------------------------------------------------ */
+const API_BASE = "http://127.0.0.1:8000";
+const USE_MOCK = false;
+
+const SPECIMENS = [
+  { id: "SPC-0413", seed: 4131, truth: "NORMAL",    severity: 0.12 },
+  { id: "SPC-0727", seed: 7272, truth: "PNEUMONIA", severity: 0.71 },
+  { id: "SPC-1180", seed: 1180, truth: "PNEUMONIA", severity: 0.44 },
+  { id: "SPC-2094", seed: 2094, truth: "NORMAL",    severity: 0.19 }
+];
+
+const FEATURE_NAMES = [
+  ["Mean intensity", "Average image brightness"],
+  ["Intensity variation", "Pixel intensity variation"],
+  ["Minimum intensity", "Darkest pixel value"],
+  ["Maximum intensity", "Brightest pixel value"],
+  ["Left region area", "Threshold-based image area"],
+  ["Right region area", "Threshold-based image area"],
+  ["Combined area", "Average regional area"]
+];
+
+/** Deterministic stand-in for the real classifier. */
+const PneumaAPI = {
+  /** POST {file} → /analyze */
+async analyzeImage(payload) {
+  if (USE_MOCK) {
+    await new Promise(r => setTimeout(r, 120));
+    return mockInference(payload.key, payload.hint);
+  }
+
+  if (!payload.file) {
+    throw new Error("No X-ray file selected.");
+  }
+
+  const fd = new FormData();
+  fd.append("file", payload.file);
+
+  const res = await fetch(`${API_BASE}/analyze`, {
+    method: "POST",
+    body: fd
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`analyze failed: ${res.status} ${text}`);
+  }
+
+  const data = await res.json();
+
+  if (!data || !data.label || !data.probabilities) {
+    throw new Error("API returned an invalid analysis response.");
+  }
+
+  return data;
+},
+  /** GET /metrics — accuracy, precision, recall, f1, confusion matrix */
+ async getMetrics() {
+  const res = await fetch(`${API_BASE}/metrics`);
+
+  if (!res.ok) {
+    throw new Error(`metrics failed: ${res.status}`);
+  }
+
+  return res.json();
+},
+  /** GET /dataset — specimen or real dataset listing */
+async listDataset() {
+  const res = await fetch(`${API_BASE}/dataset`);
+
+  if (!res.ok) {
+    throw new Error(`dataset failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+};
+/* ════════════════════ end of API seam ═══════════════════════════════════ */
+
+/* ═══════════════════════ § 3 · shell ═════════════════════════════════════ */
+const CRUMBS = { overview: "Overview", workspace: "Workspace", insights: "Model insights",
+                 history: "History", dataset: "Dataset" };
+function go(view) {
+  $$(".view").forEach(v => v.classList.toggle("hidden", v.id !== "v-" + view));
+  $$(".navbtn").forEach(b => b.setAttribute("aria-current", b.dataset.go === view ? "page" : "false"));
+  $("#crumb").textContent = CRUMBS[view];
+  document.documentElement.dataset.view = view;
+  window.scrollTo({ top: 0, behavior: "instant" });
+  if (view === "history") renderHistory();
+}
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-go]"); if (t) go(t.dataset.go);
+});
+
+$("#themeBtn").addEventListener("click", () => {
+  const cur = document.documentElement.dataset.theme
+    || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  document.documentElement.dataset.theme = cur === "dark" ? "light" : "dark";
+});
+
+let toastT;
+function toast(label, msg) {
+  $("#toastLab").textContent = label; $("#toastMsg").textContent = msg;
+  $("#toast").classList.add("on"); clearTimeout(toastT);
+  toastT = setTimeout(() => $("#toast").classList.remove("on"), 3200);
+}
+
+/* hero film */
+$("#heroFilm").innerHTML = radiograph({ seed: 7272, finding: "PNEUMONIA", severity: .66 });
+
+/* ═══════════════════════ § 4 · workspace viewer ═════════════════════════ */
+const view = { zoom: 1, x: 0, y: 0, bright: 100, contrast: 100, invert: false };
+let study = null;          // { key, name, node, hint }
+let result = null;
+
+function applyView() {
+  const w = $("#filmWrap");
+  w.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.zoom})`;
+  const f = `brightness(${view.bright}%) contrast(${view.contrast}%)${view.invert ? " invert(1)" : ""}`;
+  $("#film").style.filter = f;
+  $("#zoomVal").textContent = Math.round(view.zoom * 100) + "%";
+  $("#burnBL").textContent = `ZOOM ${Math.round(view.zoom * 100)}% · BR ${view.bright} · CT ${view.contrast}`;
+  $("#burnBR").textContent = view.invert ? "INVERTED" : "W 2048   L 1024";
+}
+function resetView() { Object.assign(view, { zoom: 1, x: 0, y: 0, bright: 100, contrast: 100, invert: false });
+  $("#bright").value = 100; $("#contrast").value = 100;
+  $("#invertBtn").setAttribute("aria-pressed", "false"); applyView(); }
+
+$$(".tb[data-z]").forEach(b => b.addEventListener("click", () => {
+  const k = b.dataset.z;
+  if (k === "+") view.zoom = clamp(view.zoom * 1.25, .5, 6);
+  else if (k === "-") view.zoom = clamp(view.zoom / 1.25, .5, 6);
+  else { view.zoom = 1; view.x = 0; view.y = 0; }
+  applyView();
+}));
+$("#bright").addEventListener("input", e => { view.bright = +e.target.value; applyView(); });
+$("#contrast").addEventListener("input", e => { view.contrast = +e.target.value; applyView(); });
+$("#invertBtn").addEventListener("click", e => {
+  view.invert = !view.invert; e.currentTarget.setAttribute("aria-pressed", String(view.invert)); applyView(); });
+$("#resetBtn").addEventListener("click", resetView);
+$("#attrBtn").addEventListener("click", e => {
+  const on = $("#attrLayer").classList.toggle("on");
+  e.currentTarget.setAttribute("aria-pressed", String(on));
+});
+
+/* drag to pan */
+(() => {
+  const st = $("#stage"); let down = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  st.addEventListener("pointerdown", e => { if (!study) return; down = true; st.classList.add("grabbing");
+    sx = e.clientX; sy = e.clientY; ox = view.x; oy = view.y; st.setPointerCapture(e.pointerId); });
+  st.addEventListener("pointermove", e => { if (!down) return;
+    view.x = ox + (e.clientX - sx); view.y = oy + (e.clientY - sy);
+    $("#filmWrap").style.transition = "none"; applyView(); });
+  const up = () => { down = false; st.classList.remove("grabbing"); $("#filmWrap").style.transition = ""; };
+  st.addEventListener("pointerup", up); st.addEventListener("pointercancel", up);
+  st.addEventListener("wheel", e => { if (!study) return; e.preventDefault();
+    view.zoom = clamp(view.zoom * (e.deltaY < 0 ? 1.08 : .93), .5, 6); applyView(); }, { passive: false });
+})();
+
+/* specimen thumbnails */
+SPECIMENS.forEach(s => {
+  const b = document.createElement("button");
+  b.className = "sample"; b.setAttribute("aria-pressed", "false");
+  b.title = `${s.id} — labelled ${s.truth.toLowerCase()}`;
+  b.innerHTML = radiograph({ seed: s.seed, finding: s.truth, severity: s.severity });
+  b.addEventListener("click", () => loadSpecimen(s));
+  $("#sampleRow").appendChild(b);
+});
+
+function markSample(id) {
+  $$("#sampleRow .sample").forEach((b, i) =>
+    b.setAttribute("aria-pressed", String(SPECIMENS[i].id === id)));
+}
+
+function loadSpecimen(s) {
+  clearResult();
+  study = { key: s.id, name: s.id, hint: { truth: s.truth, severity: s.severity },
+            svg: radiograph({ seed: s.seed, finding: s.truth, severity: s.severity }),
+            thumbSeed: s.seed, thumbFinding: s.truth };
+  $("#film").innerHTML = study.svg;
+  afterLoad(`${s.id} · SPECIMEN`);
+  markSample(s.id);
+}
+
+function loadFile(file) {
+  const ok = ["image/png", "image/jpeg", "image/webp"].includes(file.type);
+  if (!ok || file.size > 12 * 1024 * 1024) {
+    $("#uploadErr").classList.remove("hidden");
+    $("#errTitle").textContent = !ok ? "That file can't be read as a radiograph"
+                                     : "That file is larger than 12 MB";
+    $("#errBody").textContent = !ok
+      ? "Pneuma accepts single-frame JPEG, PNG or WebP images. Export the study to an image and try again."
+      : "Downsample the film or export it at a lower quality, then upload it again.";
+    toast("Rejected", file.name);
+    return;
+  }
+  $("#uploadErr").classList.add("hidden");
+  const fr = new FileReader();
+  fr.onload = () => {
+    clearResult();
+    study = { key: file.name + file.size, name: file.name, hint: null, file,
+              svg: `<img src="${fr.result}" alt="Uploaded chest radiograph">` };
+    $("#film").innerHTML = study.svg;
+    afterLoad(file.name.slice(0, 26).toUpperCase());
+    markSample(null);
+  };
+  fr.onerror = () => { $("#uploadErr").classList.remove("hidden"); };
+  fr.readAsDataURL(file);
+}
+
+function afterLoad(caption) {
+  $("#viewer").classList.add("loaded");
+  $("#dropzone").classList.add("hidden");
+  $("#burnTL").innerHTML = "<b>PNEUMA</b>STUDY LOADED";
+  $("#burnStudy").textContent = caption;
+  $("#runBtn").disabled = false; $("#clearBtn").disabled = false;
+  resetView();
+  setPipeline("idle");
+  toast("Loaded", caption);
+}
+
+$("#browseBtn").addEventListener("click", () => $("#fileInput").click());
+$("#fileInput").addEventListener("change", e => e.target.files[0] && loadFile(e.target.files[0]));
+$("#useSample").addEventListener("click", () => loadSpecimen(SPECIMENS[1]));
+$("#clearBtn").addEventListener("click", () => {
+  study = null; clearResult(); $("#film").innerHTML = "";
+  $("#viewer").classList.remove("loaded"); $("#dropzone").classList.remove("hidden");
+  $("#burnTL").innerHTML = "<b>PNEUMA</b>NO STUDY LOADED"; $("#burnStudy").textContent = "—";
+  $("#runBtn").disabled = true; $("#clearBtn").disabled = true; markSample(null);
+  $("#uploadErr").classList.add("hidden");
+});
+
+/* drag & drop onto the light box */
+["dragenter", "dragover"].forEach(ev => $("#viewer").addEventListener(ev, e => {
+  e.preventDefault(); $("#viewer").classList.add("dragover"); }));
+["dragleave", "drop"].forEach(ev => $("#viewer").addEventListener(ev, e => {
+  e.preventDefault(); $("#viewer").classList.remove("dragover"); }));
+$("#viewer").addEventListener("drop", e => {
+  const f = e.dataTransfer?.files?.[0]; if (f) loadFile(f); });
+
+const STEPS = [
+  ["Decode and validate image", 420],
+  ["Convert to grayscale", 520],
+  ["Resize to 512 × 512", 480],
+  ["Extract image-derived features", 900],
+  ["Random-forest prediction", 760],
+  ["Calculate prediction confidence", 620]
+];
+
+function setPipeline(mode, activeIdx = -1, times = []) {
+  const ul = $("#pipe");
+  ul.innerHTML = STEPS.map(([name], i) => {
+    let state = "wait", right = "";
+    if (mode === "run") {
+      if (i < activeIdx) { state = "done"; right = `<span class="tick num">${times[i]}ms</span>`; }
+      else if (i === activeIdx) { state = "run"; right = `<span class="spin"></span>`; }
+    } else if (mode === "done") { state = "done"; right = `<span class="tick num">${times[i]}ms</span>`; }
+    return `<li data-state="${state}"><span class="i">${String(i + 1).padStart(2, "0")}</span>
+      <span>${name}</span>${right}</li>`;
+  }).join("");
+  const chip = $("#stateChip");
+  const m = { idle: ["Ready", "var(--blue)"], run: ["Analyzing", "var(--amber)"],
+              done: ["Complete", "var(--green)"], error: ["Failed", "var(--red)"] }[mode] || ["Idle", "var(--ink-3)"];
+  chip.innerHTML = `<span class="dot" style="color:${m[1]}"></span>${m[0]}`;
+}
+setPipeline("wait");
+
+function clearResult() {
+  result = null;
+  $("#resultBody").classList.add("hidden"); $("#resultEmpty").classList.remove("hidden");
+  $("#xaiBody").classList.add("hidden"); $("#xaiEmpty").classList.remove("hidden");
+  $("#attrLayer").classList.remove("on"); $("#attrLayer").innerHTML = "";
+  $("#attrBtn").setAttribute("aria-pressed", "false");
+  setPipeline(study ? "idle" : "wait");
+}
+let running = false;
+async function runAnalysis() {
+  if (!study || running) return;
+  running = true;
+  $("#runBtn").disabled = true; $("#runBtn").textContent = "Analyzing…";
+  $("#viewer").classList.add("analyzing");
+  $("#resultBody").classList.add("hidden"); $("#resultEmpty").classList.remove("hidden");
+  $("#resultEmpty").querySelector("p").textContent = "Reading the film. Each stage is reported above as it completes.";
+
+  const times = [];
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let payload;
+  try {
+    for (let i = 0; i < STEPS.length; i++) {
+      setPipeline("run", i, times);
+      const d = reduce ? 60 : STEPS[i][1] * (0.75 + Math.random() * 0.5);
+      if (i === 4) {
+  if (!study.file) {
+    throw new Error("Please upload a real X-ray image. Built-in specimens are demo-only.");
+  }
+
+  payload = await PneumaAPI.analyzeImage({
+    key: study.key,
+    hint: study.hint,
+    file: study.file
+  });
+}
+      times[i] = Math.round(d);
+    }
+    setPipeline("done", -1, times);
+    $("#viewer").classList.remove("analyzing");
+    showResult(payload);
+    running = false;
+    $("#runBtn").disabled = false; $("#runBtn").textContent = "Re-run analysis";
+  } catch (err) {
+    running = false;
+    $("#viewer").classList.remove("analyzing");
+    setPipeline("error");
+    $("#runBtn").disabled = false; $("#runBtn").textContent = "Retry analysis";
+    $("#resultEmpty").querySelector("p").textContent =
+      "The classifier didn't respond. Check that the service is running, then retry.";
+    toast("Failed", String(err.message || err));
+  }
+}
+$("#runBtn").addEventListener("click", runAnalysis);
+
+function countUp(el, to, suffix = "%") {
+  const dur = 620, t0 = performance.now();
+  const step = t => { const k = clamp((t - t0) / dur, 0, 1);
+    const e = 1 - Math.pow(1 - k, 3);
+    el.textContent = (to * e).toFixed(1) + suffix;
+    if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+
+function showResult(res) {
+  if (!res || !res.label || !res.probabilities) {
+  throw new Error("API returned an invalid analysis result.");
+}
+  result = res;
+  $("#resultEmpty").classList.add("hidden"); $("#resultBody").classList.remove("hidden");
+
+  const v = $("#verdict");
+  v.dataset.c = res.label;
+  const w = $("#verdictWord");
+  w.textContent = res.label; w.classList.remove("reveal"); void w.offsetWidth; w.classList.add("reveal");
+  $("#verdictSub").textContent = res.label === "PNEUMONIA"
+    ? "Findings consistent with pneumonia in the labelled training distribution. Prototype output — confirm against the film."
+    : "No pneumonia-like pattern found in this film. A negative result does not rule out disease.";
+
+  const c = res.confidence * 100;
+  countUp($("#confBig"), c);
+  $("#confBar").style.width = clamp((c - 50) / 50 * 100, 0, 100) + "%";
+  const margin = Math.abs(res.probabilities.PNEUMONIA - res.probabilities.NORMAL) * 100;
+  $("#confMargin").textContent = `margin ${margin.toFixed(1)} pts`;
+  const band = $("#confBand");
+  if (c >= 85) { band.className = "band hi"; band.textContent = "high"; }
+  else if (c >= 70) { band.className = "band lo"; band.textContent = "moderate"; }
+  else { band.className = "band lo"; band.textContent = "low — treat as undecided"; }
+
+  const pP = res.probabilities.PNEUMONIA;
+  $("#fillN").style.width = (res.probabilities.NORMAL * 100) + "%";
+  $("#fillP").style.width = (pP * 100) + "%";
+  $("#needle").style.left = (pP * 100) + "%";
+  $("#pN").textContent = pct(res.probabilities.NORMAL);
+  $("#pP").textContent = pct(pP);
+if (res.severityIndex == null) {
+  $("#sevVal").textContent = "n/a";
+  $("#sevWord").textContent = "not computed for normal films";
+  $("#sevBar").style.width = "0%";
+} else {
+  const index = Number(res.severityIndex);
+
+  $("#sevVal").textContent = index.toFixed(1) + " / 100";
+
+  $("#sevWord").textContent =
+    "Prototype image-derived index · not a clinical severity score";
+
+  setTimeout(() => {
+    $("#sevBar").style.width = clamp(index, 0, 100) + "%";
+  }, 60);
+}
+  const attr = attribution(res.regions);
+  $("#attrLayer").innerHTML = attr; $("#attrLayer").classList.add("on");
+  $("#attrBtn").setAttribute("aria-pressed", "true");
+  renderXai(res, attr);
+  pushHistory(res);
+  toast(res.label === "PNEUMONIA" ? "Pneumonia" : "Normal", `${study.name} · ${pct(res.confidence)} confidence`);
+}
+
+/* ═══════════════════════ § 6 · explainability ═══════════════════════════ */
+function renderXai(res, attr) {
+  $("#xaiEmpty").classList.add("hidden");
+  $("#xaiBody").classList.remove("hidden");
+
+  // No clinical heatmap/attribution is generated by the current model.
+  $("#xaiA").innerHTML = study.svg;
+  $("#xaiB").innerHTML = study.svg;
+  $("#xaiC").innerHTML = study.svg;
+  $("#xaiAttr").innerHTML = "";
+
+  $("#xaiBurn").textContent = "FEATURE ANALYSIS";
+
+  $("#whyText").textContent =
+    "The Random Forest model uses image-derived intensity and regional area features for its prediction. These features are not clinical measurements.";
+
+  $("#featList").innerHTML = (res.features || []).map(f => `
+    <div class="f">
+      <span class="nm">
+        ${f.name}
+        <span>${f.detail}</span>
+      </span>
+
+      <span class="meter b">
+        <i style="width:${Math.min(100, Math.max(0, Number(f.value) / 255 * 100)).toFixed(0)}%"></i>
+      </span>
+
+      <span class="vv">
+        ${Number(f.value).toFixed(2)}
+      </span>
+    </div>
+  `).join("");
+}
+/* ═══════════════════════ § 7 · history ══════════════════════════════════ */
+const HKEY = "pneuma.history.v1";
+function readHistory() {
+  try { return JSON.parse(localStorage.getItem(HKEY) || "[]"); } catch { return []; }
+}
+function writeHistory(list) {
+  try { localStorage.setItem(HKEY, JSON.stringify(list.slice(0, 60))); } catch {}
+}
+function pushHistory(res) {
+  const list = readHistory();
+  list.unshift({
+    id: "AN-" + Date.now().toString(36).toUpperCase().slice(-6),
+    name: study.name, at: Date.now(), label: res.label,
+    confidence: res.confidence, status: "complete",
+    seed: study.thumbSeed ?? null, finding: study.thumbFinding ?? res.label
+  });
+  writeHistory(list);
+}
+function when(ts) {
+  const d = new Date(ts), n = Date.now() - ts;
+  if (n < 60e3) return "just now";
+  if (n < 36e5) return Math.floor(n / 60e3) + " min ago";
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+function renderHistory() {
+  const list = readHistory();
+  $("#histEmpty").classList.toggle("hidden", list.length > 0);
+  $("#histWrap").classList.toggle("hidden", list.length === 0);
+  $("#histBody").innerHTML = list.map(h => {
+    const c = h.confidence * 100;
+    const statusTag = h.status === "complete" ? `<span class="tag i">complete</span>`
+      : h.status === "review" ? `<span class="tag q">needs review</span>`
+      : `<span class="tag q">failed</span>`;
+    return `<tr class="row">
+      <td><span class="thumb">${radiograph({ seed: h.seed ?? 99, finding: h.finding || h.label, severity: .6 })}</span></td>
+      <td><span style="font-variation-settings:'wdth' 94,'wght' 540">${h.name}</span>
+          <div class="lab">${h.id}</div></td>
+      <td class="num" style="font-size:12.5px;color:var(--ink-2)">${when(h.at)}</td>
+      <td><span class="tag ${h.label === "NORMAL" ? "n" : "p"}">${h.label.toLowerCase()}</span></td>
+      <td><span class="confcell"><span class="meter ${h.label === "NORMAL" ? "g" : "r"}">
+          <i style="width:${c}%"></i></span><span class="num" style="font-size:12px">${c.toFixed(1)}%</span></span></td>
+      <td>${statusTag}</td>
+      <td><span class="open">open</span></td>
+    </tr>`;
+  }).join("");
+}
+$("#clearHist").addEventListener("click", () => { writeHistory([]); renderHistory(); toast("Cleared", "History is empty"); });
+
+
+/* ═══════════════════════ § 8 · dataset gallery ══════════════════════════ */
+
+/* ═══════════════════════ keyboard ═══════════════════════════════════════ */
+addEventListener("keydown", e => {
+  if (e.target.matches("input,textarea")) return;
+  const k = e.key.toLowerCase();
+  if (k === "a") { go("workspace"); if (!study) loadSpecimen(SPECIMENS[1]); else runAnalysis(); }
+  if (k === "i" && study) $("#invertBtn").click();
+  if (k === "r" && study) resetView();
+  if (k === "escape" && study) $("#clearBtn").click();
+});
+
+applyView();
+</script>
+
+</body>
+</html>
